@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using PlantProject.UI;
 
 namespace PlantProject.Core
 {
@@ -9,6 +10,8 @@ namespace PlantProject.Core
     public partial class GodotUnit2D : Node2D, IUnit
     {
         private UnitBase? _model;
+        private HealthBar2D? _healthBar;
+        private float _damagePowerMod;
 
         [Export] public string UnitName { get; set; } = "Unit";
         [Export] public int MaxHpInit { get; set; } = 10;
@@ -25,12 +28,17 @@ namespace PlantProject.Core
         public float Speed => _model?.Speed ?? SpeedInit;
         public IReadOnlyList<IAction> Actions => _model?.Actions ?? Array.Empty<IAction>();
         public bool IsAlive => _model?.IsAlive ?? CurrentHpInit > 0;
+        // Temporary additive multiplier to power-based damage (e.g., +0.1 per kill)
+        public float DamagePowerMod => _damagePowerMod;
 
         public event UnitDamagedEventHandler? Damaged;
         public event UnitHealedEventHandler? Healed;
         public event UnitDiedEventHandler? Died;
         public event UnitActionEventHandler? ActionStarted;
         public event UnitActionEventHandler? ActionCompleted;
+
+        // When true, this unit is not allowed to perform actions (e.g., sprinting)
+        protected virtual bool ActionsLocked => false;
 
         public override void _Ready()
         {
@@ -39,6 +47,12 @@ namespace PlantProject.Core
                 var def = CreateDefaultModel();
                 SetUnitModel(def);
             }
+
+            EnsureHealthBar();
+
+            // Group units for gameplay queries (e.g., weapon hit checks)
+            if (!IsInGroup("units"))
+                AddToGroup("units");
         }
 
         protected virtual UnitBase CreateDefaultModel()
@@ -52,6 +66,11 @@ namespace PlantProject.Core
             UnsubscribeFromModel();
             _model = model;
             SubscribeToModel();
+        }
+
+        public void AddDamagePowerMod(float delta)
+        {
+            _damagePowerMod += delta;
         }
 
         private void SubscribeToModel()
@@ -72,6 +91,44 @@ namespace PlantProject.Core
             _model.Died -= OnModelDied;
             _model.ActionStarted -= OnModelActionStarted;
             _model.ActionCompleted -= OnModelActionCompleted;
+        }
+
+        private void EnsureHealthBar()
+        {
+            if (_healthBar != null) return;
+            var existing = GetNodeOrNull<HealthBar2D>("HealthBar");
+            if (existing != null)
+            {
+                _healthBar = existing;
+                _healthBar.ZAsRelative = false;
+                _healthBar.ZIndex = 10000;
+                return;
+            }
+
+            var hb = new HealthBar2D
+            {
+                Name = "HealthBar",
+                ZIndex = 10000,
+                ZAsRelative = false
+            };
+
+            // Try to size and position based on a child sprite named "Sprite"
+            var sprite = GetNodeOrNull<Sprite2D>("Sprite");
+            if (sprite?.Texture != null)
+            {
+                var texSize = sprite.Texture.GetSize();
+                var scale = sprite.Scale;
+                float width = texSize.X * scale.X;
+                float height = texSize.Y * scale.Y;
+                hb.Size = new Vector2(Mathf.Max(40f, width), 6f);
+                hb.Offset = new Vector2(0f, -(height * 0.5f + 8f));
+            }
+
+            AddChild(hb);
+            _healthBar = hb;
+            // Ensure highest world-space visibility
+            _healthBar.ZAsRelative = false;
+            _healthBar.ZIndex = 10000;
         }
 
         private void OnModelDamaged(IUnit unit, int amount, IUnit? source) => Damaged?.Invoke(this, amount, source);
@@ -95,12 +152,14 @@ namespace PlantProject.Core
         public bool CanPerformAction(IAction action, IUnit? target = null)
         {
             if (_model == null) return false;
+            if (ActionsLocked) return false;
             return _model.CanPerformAction(action, target);
         }
 
         public void PerformAction(IAction action, IUnit? target = null)
         {
             if (_model == null) return;
+            if (ActionsLocked) return;
             _model.PerformAction(action, target);
         }
 
@@ -111,4 +170,3 @@ namespace PlantProject.Core
         }
     }
 }
-

@@ -12,10 +12,16 @@ config_version=5
 
 config/name="PlantProject"
 run/main_scene="res://scenes/levels/simple_level.tscn"
-config/features=PackedStringArray("4.4", "Forward Plus")
+config/features=PackedStringArray("4.4", "C#")
 config/icon="res://icon.svg"
 
 [dotnet]
 
 project/assembly_name="PlantProject"
 project/target_framework="net8.0"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/resizable=true

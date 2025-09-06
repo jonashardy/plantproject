@@ -1,0 +1,17 @@
+[gd_resource type="Resource" load_steps=2]
+
+[ext_resource type="Script" path="res://scripts/core/game/DifficultyConfig.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+HpGrowth = 1.12
+DefensePerLevel = 2.5
+DefenseCap = 60
+PowerGrowth = 0.1
+SpeedGrowth = 0.03
+SpeedCap = 1.5
+CooldownDecrease = 0.05
+CooldownMin = 0.6
+CooldownMax = 1.5
+SpawnIncrement = 2
+

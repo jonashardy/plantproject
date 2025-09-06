@@ -1,14 +1,12 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3 uid="uid://bbpleqjut567m"]
 
-[ext_resource type="Script" path="res://scripts/player/PlayerUnit2D.cs" id="1_r2x2f"]
+[ext_resource type="Script" uid="uid://ct0rhxqhnu6gd" path="res://scripts/player/PlayerUnit2D.cs" id="1"]
 
 [node name="Player" type="Node2D"]
-script = ExtResource("1_r2x2f")
+script = ExtResource("1")
 UnitName = "Player"
-MaxHpInit = 20
-CurrentHpInit = 20
+MaxHpInit = 200
+CurrentHpInit = 200
 DefenseInit = 2
-PowerLevelInit = 5
+PowerLevelInit = 2
 SpeedInit = 180.0
-AddDefaultMelee = true
-

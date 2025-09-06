@@ -93,8 +93,13 @@ namespace PlantProject.Core
 
         protected virtual int CalculateDamageTaken(int amount, IUnit? source)
         {
-            // Default: flat defense reduction.
-            return Math.Max(0, amount - Defense);
+            // Convert Defense to percentage damage reduction (0-100 -> 0% - 100%)
+            if (amount <= 0) return 0;
+            int clampedDef = Math.Clamp(Defense, 0, 100);
+            float reduction = clampedDef / 100f;
+            float reduced = amount * (1f - reduction);
+            int final = Math.Max(0, (int)MathF.Round(reduced));
+            return final;
         }
 
         protected void AddAction(IAction action)
@@ -112,4 +117,3 @@ namespace PlantProject.Core
         protected virtual void OnActionCompleted(IAction action) => ActionCompleted?.Invoke(this, action);
     }
 }
-
