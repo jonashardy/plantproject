@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/EnemyUnit2D.cs" id="1_41kqk"]
+
+[node name="Enemy" type="Node2D"]
+script = ExtResource("1_41kqk")
+UnitName = "Sprout"
+MaxHpInit = 12
+CurrentHpInit = 12
+DefenseInit = 1
+PowerLevelInit = 3
+SpeedInit = 140.0
+AddDefaultMelee = true
+
