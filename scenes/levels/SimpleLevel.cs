@@ -2,6 +2,7 @@
 using Godot;
 using PlantProject.Core;
 using PlantProject.UI;
+using PlantProject.Audio;
 
 namespace PlantProject.Levels
 {
@@ -75,6 +76,25 @@ namespace PlantProject.Levels
             // Add HUD overlay (CanvasLayer) so it doesn't interfere with world space
             var hud = new Hud { Name = "HUD", Layer = 1 };
             AddChild(hud);
+
+            // Ensure a single persistent ambient music player exists under the scene tree root
+            var root = GetTree().Root;
+            var amb = root.GetNodeOrNull<AmbientMusic>("AmbientMusic");
+            if (amb == null)
+            {
+                amb = new AmbientMusic { Name = "AmbientMusic" };
+                // Add to root so it persists across scene reloads (no abrupt restarts)
+                root.AddChild(amb);
+            }
+            // On starting a fresh run from level entry, switch to the gameplay track (only if not already set)
+            if (GameProgress.CurrentLevelNumber == 1 && GameProgress.LivesRemaining == GameProgress.LivesInitial)
+            {
+                var cur = amb.CurrentTrackName ?? string.Empty;
+                if (!cur.ToLowerInvariant().Contains("neon shadows"))
+                {
+                    amb.CallDeferred("PlayTrackByPath", "res://assets/audio/music/Neon Shadows.mp3");
+                }
+            }
         }
 
         public override void _Process(double delta)

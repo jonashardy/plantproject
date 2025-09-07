@@ -69,7 +69,7 @@ namespace PlantProject.UI
 
             vbox.AddChild(new Control { CustomMinimumSize = new Vector2(0, 16) });
 
-            var btnRestart = new Button { Text = "Restart Level" };
+            var btnRestart = new Button { Text = "Restart Game" };
             btnRestart.Pressed += () => EmitSignal(SignalName.RestartRequested);
             vbox.AddChild(btnRestart);
 

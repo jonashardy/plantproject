@@ -4,6 +4,10 @@ namespace PlantProject.Core
 {
     public static class GameProgress
     {
+        // Lives
+        public static int LivesInitial { get; set; } = 3;
+        public static int LivesRemaining { get; set; } = LivesInitial;
+
         public static int CurrentLevelNumber { get; set; } = 1;
         // Run upgrades
         public static int BonusPowerLevels { get; set; } = 0;
@@ -19,6 +23,7 @@ namespace PlantProject.Core
         public static void Reset()
         {
             CurrentLevelNumber = 1;
+            LivesRemaining = LivesInitial;
             BonusPowerLevels = 0;
             SwordBaseDamageMultiplier = 1f;
             SwordCooldownDelta = 0f;
@@ -27,6 +32,13 @@ namespace PlantProject.Core
             DefenseAdd = 0;
             SpeedMultiplier = 1f;
             RegenPercentBonus = 0f;
+        }
+
+        public static bool UseLife()
+        {
+            if (LivesRemaining <= 0) return false;
+            LivesRemaining = System.Math.Max(0, LivesRemaining - 1);
+            return LivesRemaining > 0;
         }
     }
 }

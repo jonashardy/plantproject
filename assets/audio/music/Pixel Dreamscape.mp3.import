@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://dgmr2dgpl5fcc"
+path="res://.godot/imported/Pixel Dreamscape.mp3-e70f5643b50eca0334cfbc7ed87d927b.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/music/Pixel Dreamscape.mp3"
+dest_files=["res://.godot/imported/Pixel Dreamscape.mp3-e70f5643b50eca0334cfbc7ed87d927b.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

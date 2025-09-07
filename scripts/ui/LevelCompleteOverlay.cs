@@ -1,5 +1,6 @@
 #nullable enable
 using Godot;
+using PlantProject.Core;
 
 namespace PlantProject.UI
 {
@@ -100,11 +101,66 @@ namespace PlantProject.UI
             for (int i = 0; i < choices.Length; i++)
             {
                 var c = choices[i];
-                var btn = new Button { Text = $"{c.Title}", TooltipText = c.Description };
-                int idx = i;
-                btn.Pressed += () => EmitSignal(SignalName.RewardSelected, idx);
-                _choiceBox.AddChild(btn);
+                var opt = CreateRewardOption(c, i);
+                _choiceBox.AddChild(opt);
             }
+        }
+
+        private Control CreateRewardOption(RewardChoice c, int idx)
+        {
+            // Panel that looks button-like and fully controls its own layout/wrapping
+            var panel = new PanelContainer
+            {
+                TooltipText = c.Description,
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                MouseFilter = MouseFilterEnum.Stop // capture clicks
+            };
+
+            // Default styling and hover highlight
+            var sbNormal = new StyleBoxFlat { BgColor = new Color(0f, 0f, 0f, 0.6f) };
+            sbNormal.CornerRadiusTopLeft = 6;
+            sbNormal.CornerRadiusTopRight = 6;
+            sbNormal.CornerRadiusBottomLeft = 6;
+            sbNormal.CornerRadiusBottomRight = 6;
+            var sbHover = new StyleBoxFlat { BgColor = new Color(0.2f, 0.2f, 0.2f, 0.8f) };
+            sbHover.CornerRadiusTopLeft = 6;
+            sbHover.CornerRadiusTopRight = 6;
+            sbHover.CornerRadiusBottomLeft = 6;
+            sbHover.CornerRadiusBottomRight = 6;
+            panel.AddThemeStyleboxOverride("panel", sbNormal);
+            panel.MouseEntered += () => panel.AddThemeStyleboxOverride("panel", sbHover);
+            panel.MouseExited += () => panel.AddThemeStyleboxOverride("panel", sbNormal);
+
+            // Click handler
+            panel.GuiInput += (InputEvent ev) =>
+            {
+                if (ev is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+                {
+                    EmitSignal(SignalName.RewardSelected, idx);
+                }
+            };
+
+            var margin = new MarginContainer();
+            margin.AddThemeConstantOverride("margin_left", 12);
+            margin.AddThemeConstantOverride("margin_right", 12);
+            margin.AddThemeConstantOverride("margin_top", 8);
+            margin.AddThemeConstantOverride("margin_bottom", 8);
+            panel.AddChild(margin);
+
+            var rich = new RichTextLabel
+            {
+                BbcodeEnabled = true,
+                FitContent = true,
+                AutowrapMode = TextServer.AutowrapMode.Word,
+                ScrollActive = false,
+                MouseFilter = MouseFilterEnum.Ignore,
+                SizeFlagsHorizontal = SizeFlags.ExpandFill
+            };
+            // Title + bolded bonus text in parentheses
+            rich.Text = $"{c.Title} ([b]{c.Description}[/b])";
+            margin.AddChild(rich);
+
+            return panel;
         }
     }
 }

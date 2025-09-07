@@ -3,6 +3,7 @@ using Godot;
 using PlantProject.Core;
 using PlantProject.Enemies;
 using PlantProject.Levels;
+using PlantProject.Audio;
 
 namespace PlantProject.UI
 {
@@ -14,6 +15,7 @@ namespace PlantProject.UI
 
         private ColorRect? _topBar;
         private Label? _hpLabel;
+        private Label? _livesLabel;
         private GodotUnit2D? _player;
         private EnemySpawner2D? _spawner;
         private Label? _spawnLabel;
@@ -25,6 +27,7 @@ namespace PlantProject.UI
         private PlantProject.Core.RewardChoice[]? _pendingRewards;
         private PauseOverlay? _pause;
         private bool _pauseShown;
+        private CountdownOverlay? _countdown;
 
         public override void _Ready()
         {
@@ -40,6 +43,7 @@ namespace PlantProject.UI
                 _player.Died += OnPlayerDied;
                 UpdateHpText();
             }
+            UpdateLivesText();
 
             _spawner = FindSpawner();
             if (_spawner != null)
@@ -51,6 +55,21 @@ namespace PlantProject.UI
             }
 
             UpdateLevelText();
+
+            // Defer countdown start to ensure all units (player + enemies) have spawned
+            CallDeferred(nameof(StartFreshRunCountdown));
+        }
+
+        private async void StartFreshRunCountdown()
+        {
+            // Only on fresh run
+            if (!(GameProgress.CurrentLevelNumber == 1 && GameProgress.LivesRemaining == GameProgress.LivesInitial))
+                return;
+
+            // Wait a tiny moment to ensure spawner _Ready() completed and enemies are in the tree
+            var timer = GetTree().CreateTimer(0.01);
+            await ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
+            _countdown?.StartCountdown(3.0f);
         }
 
         private static void EnsureUiActions()
@@ -120,6 +139,24 @@ namespace PlantProject.UI
             bar.AddChild(hp);
             _hpLabel = hp;
 
+            // Lives label (row 1, center)
+            var lives = new Label
+            {
+                Name = "LivesLabel",
+                Text = "Lives: 3",
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            lives.AnchorLeft = 0f;
+            lives.AnchorRight = 1f;
+            lives.AnchorTop = 0f;
+            lives.OffsetLeft = 0f;
+            lives.OffsetRight = 0f;
+            lives.OffsetTop = row1Y;
+            lives.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 1f));
+            lives.AddThemeFontSizeOverride("font_size", 36);
+            bar.AddChild(lives);
+            _livesLabel = lives;
+
             // Level label (row 1, right)
             var lvl = new Label
             {
@@ -186,6 +223,10 @@ namespace PlantProject.UI
             _pause.Connect(PauseOverlay.SignalName.ResumeRequested, new Callable(this, nameof(OnResumePressed)));
             _pause.Connect(PauseOverlay.SignalName.RestartRequested, new Callable(this, nameof(OnRestartPressed)));
             _pause.Connect(PauseOverlay.SignalName.QuitRequested, new Callable(this, nameof(OnQuitPressed)));
+
+            // Countdown overlay for new game start
+            _countdown = new CountdownOverlay { Name = "Countdown" };
+            AddChild(_countdown);
         }
 
         private GodotUnit2D? FindPlayer()
@@ -218,7 +259,17 @@ namespace PlantProject.UI
         private void OnPlayerDied(IUnit unit, IUnit? source)
         {
             UpdateHpText();
-            ShowGameOver();
+            // Consume a life; if any remain, auto-restart level, otherwise game over
+            bool hasMore = GameProgress.UseLife();
+            UpdateLivesText();
+            if (hasMore)
+            {
+                OnRestartPressed();
+            }
+            else
+            {
+                ShowGameOver();
+            }
         }
 
         private void UpdateHpText()
@@ -257,6 +308,12 @@ namespace PlantProject.UI
             int alive = _spawner?.TotalAlive ?? 0;
             int total = _spawner?.TotalSpawned ?? 0;
             _spawnLabel.Text = $"Enemies: {alive}/{total}";
+        }
+
+        private void UpdateLivesText()
+        {
+            if (_livesLabel == null) return;
+            _livesLabel.Text = $"Lives: {GameProgress.LivesRemaining}";
         }
 
         private void UpdatePowerText()
@@ -322,6 +379,16 @@ namespace PlantProject.UI
         {
             var tree = GetTree();
             tree.Paused = false;
+            // If restarting from Game Over overlay, treat as returning to Start Menu
+            if (_gameOver != null && _gameOver.Visible)
+            {
+                GameProgress.Reset();
+                var amb = tree.Root.GetNodeOrNull<AmbientMusic>("AmbientMusic");
+                amb?.PlayTrackByPath("res://assets/audio/music/Pixel Dreamscape.mp3");
+                tree.ChangeSceneToFile("res://scenes/ui/start_menu.tscn");
+                return;
+            }
+            // Otherwise, restart level only (Pause overlay path)
             if (tree.ReloadCurrentScene() != Error.Ok)
             {
                 var path = tree.CurrentScene?.SceneFilePath;
@@ -331,6 +398,9 @@ namespace PlantProject.UI
 
         private void OnQuitPressed()
         {
+            // Switch back to default menu track when leaving the game
+            var amb = GetTree().Root.GetNodeOrNull<AmbientMusic>("AmbientMusic");
+            amb?.PlayTrackByPath("res://assets/audio/music/Pixel Dreamscape.mp3");
             GetTree().Quit();
         }
 
@@ -357,6 +427,7 @@ namespace PlantProject.UI
         private void TogglePause()
         {
             // Don't allow pausing over blocking overlays
+            if (_countdown != null && _countdown.Visible) return;
             if (_gameOver != null && _gameOver.Visible) return;
             if (_levelComplete != null && _levelComplete.Visible) return;
 
