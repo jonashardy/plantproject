@@ -167,6 +167,11 @@ namespace PlantProject.Enemies
             if (source is GodotUnit2D killer && killer.IsInGroup("player"))
             {
                 killer.AddDamagePowerMod(0.1f);
+                // Add special charge on kill
+                if (killer is PlantProject.Player.PlayerUnit2D p)
+                {
+                    p.AddSpecialCharge(p.SpecialKillBonus);
+                }
             }
             var timer = GetTree().CreateTimer(1.0);
             await ToSignal(timer, SceneTreeTimer.SignalName.Timeout);

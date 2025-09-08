@@ -12,6 +12,9 @@ namespace PlantProject.Items
         {
             base._Ready();
 
+            // Disable the full-cone overlay for enemies
+            ShowAttackArc = false;
+
             // Make enemy sword half as long and tinted blue
             var sprite = GetNodeOrNull<Sprite2D>("Sprite");
             if (sprite != null)

@@ -15,7 +15,7 @@ namespace PlantProject.Player
         [Export] public float SprintMultiplier { get; set; } = 2f;
         [Export] public bool LockActionsWhenSprinting { get; set; } = true;
         [Export] public float RegenDelaySeconds { get; set; } = 2.0f;
-        [Export] public float RegenPercentPerSecond { get; set; } = 0.05f; // 5% of Max HP per second
+        [Export] public float RegenPercentPerSecond { get; set; } = 0.05f; // Base fallback; actual regen scales with Power
 
         public bool IsSprinting { get; private set; }
 
@@ -31,6 +31,10 @@ namespace PlantProject.Player
         private Texture2D? _texNormal;
         private Texture2D? _texSprint;
         private bool _usingSprintVisual;
+        [Export] public float SpecialPassivePerSecond { get; set; } = 0.02f; // 2% per second
+        [Export] public float SpecialKillBonus { get; set; } = 0.12f;       // +12% per kill
+        private float _specialCharge; // 0..1
+        public float SpecialCharge => _specialCharge;
 
         public override void _Ready()
         {
@@ -93,6 +97,7 @@ namespace PlantProject.Player
             AddChild(_directionIndicator);
 
             // Apply regen upgrade and listen for self events to drive regen timers
+            // Keep upgrade for legacy fallback; actual regen computed per-frame from Power
             RegenPercentPerSecond = MathF.Max(0f, RegenPercentPerSecond + PlantProject.Core.GameProgress.RegenPercentBonus);
             ActionStarted += OnSelfActionStarted;
             Damaged += OnSelfDamaged;
@@ -111,8 +116,10 @@ namespace PlantProject.Player
 
             if (input != Vector2.Zero)
             {
-                float mul = IsSprinting ? Mathf.Max(1f, SprintMultiplier) : 1f;
-                var velocity = input.Normalized() * Speed * mul * (float)delta;
+                float sprintMul = IsSprinting ? Mathf.Max(1f, SprintMultiplier) : 1f;
+                // Scale movement speed with Power: +10% per Power level
+                float powerSpeedMul = 1f + 0.1f * Math.Max(0, PowerLevel);
+                var velocity = input.Normalized() * Speed * sprintMul * powerSpeedMul * (float)delta;
                 Position += velocity;
                 _facing = input.Normalized();
             }
@@ -144,13 +151,21 @@ namespace PlantProject.Player
             _sinceLastAttack += (float)delta;
             _sinceLastDamage += (float)delta;
 
+            // Passive special charge generation while alive
+            if (IsAlive && SpecialPassivePerSecond > 0f)
+            {
+                _specialCharge = Mathf.Clamp(_specialCharge + SpecialPassivePerSecond * (float)delta, 0f, 1f);
+            }
+
             // Start healing if no attacks and no damage for RegenDelaySeconds
             if (_sinceLastAttack >= RegenDelaySeconds && _sinceLastDamage >= RegenDelaySeconds && CurrentHp < MaxHp)
             {
                 float missingFrac = 1f - (float)CurrentHp / Math.Max(1, MaxHp);
                 missingFrac = Mathf.Clamp(missingFrac, 0f, 1f);
-                // Scale regen with missing health: at 0% HP => ~2x base, near 100% => ~base
-                float perSecond = MathF.Max(0f, MaxHp * RegenPercentPerSecond * (1f + missingFrac));
+                // Base regen scales linearly with Power: 1 Power = 1% MaxHP/sec
+                float regenPercentBase = 0.01f * Math.Max(0, PowerLevel) + MathF.Max(0f, PlantProject.Core.GameProgress.RegenPercentBonus);
+                // Keep missing-health scaling for smoother feel
+                float perSecond = MathF.Max(0f, MaxHp * regenPercentBase * (1f + missingFrac));
                 float toHealF = perSecond * (float)delta + _regenCarry;
                 int toHeal = (int)MathF.Floor(toHealF);
                 _regenCarry = toHealF - toHeal;
@@ -266,6 +281,12 @@ namespace PlantProject.Player
         {
             _sinceLastDamage = 0f;
             _regenCarry = 0f;
+        }
+
+        public void AddSpecialCharge(float amount)
+        {
+            if (amount <= 0f) return;
+            _specialCharge = Mathf.Clamp(_specialCharge + amount, 0f, 1f);
         }
     }
 }

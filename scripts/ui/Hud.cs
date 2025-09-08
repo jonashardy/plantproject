@@ -21,6 +21,7 @@ namespace PlantProject.UI
         private Label? _spawnLabel;
         private Label? _powerLabel;
         private Label? _levelLabel;
+        private SpecialMeter? _special;
         private GameOverOverlay? _gameOver;
         private LevelCompleteOverlay? _levelComplete;
         private bool _levelCompleteShown;
@@ -58,6 +59,22 @@ namespace PlantProject.UI
 
             // Defer countdown start to ensure all units (player + enemies) have spawned
             CallDeferred(nameof(StartFreshRunCountdown));
+        }
+
+        public override void _Process(double delta)
+        {
+            // Keep special meter updated
+            if (_special != null)
+            {
+                if (_player is PlantProject.Player.PlayerUnit2D p)
+                {
+                    _special.SetValue(p.SpecialCharge);
+                }
+                else
+                {
+                    _special.SetValue(0f);
+                }
+            }
         }
 
         private async void StartFreshRunCountdown()
@@ -172,6 +189,25 @@ namespace PlantProject.UI
             lvl.AddThemeFontSizeOverride("font_size", 36);
             bar.AddChild(lvl);
             _levelLabel = lvl;
+
+            // Special meter (centered, under Lives)
+            var meter = new SpecialMeter
+            {
+                Name = "SpecialMeter",
+                // Slightly longer and taller; match row-2 font height (36)
+                CustomMinimumSize = new Vector2(360, 36)
+            };
+            // Center horizontally, place on row2 (under the lives counter)
+            meter.AnchorLeft = 0.5f;
+            meter.AnchorRight = 0.5f;
+            meter.AnchorTop = 0f;
+            meter.AnchorBottom = 0f;
+            meter.OffsetLeft = -180f; // half width
+            meter.OffsetRight = 180f;
+            meter.OffsetTop = row2Y; // align with other row-2 elements and add spacing from Lives
+            meter.OffsetBottom = meter.OffsetTop + 36f;
+            bar.AddChild(meter);
+            _special = meter;
 
             // Enemies count label (row 2, right)
             var sc = new Label

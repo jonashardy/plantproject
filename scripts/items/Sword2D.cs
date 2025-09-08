@@ -16,6 +16,10 @@ namespace PlantProject.Items
         [Export] public int BaseDamage { get; set; } = 10;
         [Export] public float ConeHalfAngleDegrees { get; set; } = 60f; // half-angle of the arc
         [Export] public float RangePadding { get; set; } = 12f; // small tolerance at tip/start
+        [Export] public bool ShowAttackArc { get; set; } = true; // full-cone overlay
+        [Export] public Color AttackArcColor { get; set; } = new Color(1f, 1f, 1f, 0.18f);
+        [Export] public int AttackArcSegments { get; set; } = 36;
+        [Export] public int AttackArcZIndex { get; set; } = 350;
 
         private Sprite2D? _sprite;
         private Vector2 _facing = Vector2.Right;
@@ -23,6 +27,7 @@ namespace PlantProject.Items
         private float _attackTimer;
         private float _cooldownTimer;
         private readonly HashSet<IUnit> _hitThisSwing = new();
+        private AttackArc2D? _arc;
 
         public override void _Ready()
         {
@@ -38,6 +43,14 @@ namespace PlantProject.Items
                 };
                 AddChild(_sprite);
             }
+
+            // Prepare a reusable attack arc overlay as a child of this sword
+            _arc = new AttackArc2D
+            {
+                Name = "AttackArc",
+                Visible = false
+            };
+            AddChild(_arc);
         }
 
         public override void _Process(double delta)
@@ -82,6 +95,18 @@ namespace PlantProject.Items
             UpdateTransform();
             if (_sprite != null) _sprite.Visible = true;
 
+            // Configure and show full-cone overlay
+            if (ShowAttackArc && _arc != null)
+            {
+                ComputeConeGeometry(out float inner, out float outer, out float halfRad, out float offset);
+                float radius = MathF.Max(0f, outer - inner);
+                _arc.Configure(radius, halfRad, AttackArcColor, AttackArcSegments, AttackArcZIndex);
+                // Place arc so it starts at the inner radius along local +X (facing)
+                _arc.Position = new Vector2(inner - offset, 0f);
+                _arc.Rotation = 0f; // inherit sword rotation
+                _arc.Visible = true;
+            }
+
             // Fire the first action on the owning unit to emit events, if present
             if (GetParent() is GodotUnit2D unit && unit.Actions.Count > 0)
             {
@@ -95,6 +120,7 @@ namespace PlantProject.Items
         {
             _isAttacking = false;
             if (_sprite != null) _sprite.Visible = false;
+            if (_arc != null) _arc.Visible = false;
         }
 
         private void UpdateTransform()
@@ -122,6 +148,31 @@ namespace PlantProject.Items
             float swordHalfLen = swordSize.X * 0.5f * _sprite.Scale.X;
             float offset = parentExtent + swordHalfLen;
             Position = dir * offset;
+        }
+
+        private void ComputeConeGeometry(out float inner, out float outer, out float halfRad, out float offset)
+        {
+            // Derive the same geometry values used for hit checks
+            float parentExtent = 0f;
+            if (GetParent() is GodotUnit2D unit)
+            {
+                var pSprite = unit.GetNodeOrNull<Sprite2D>("Sprite");
+                if (pSprite?.Texture != null)
+                {
+                    var texSize = pSprite.Texture.GetSize();
+                    var scale = pSprite.Scale;
+                    parentExtent = Mathf.Max(texSize.X * scale.X, texSize.Y * scale.Y) * 0.5f;
+                }
+            }
+
+            Vector2 swordSize = _sprite?.Texture?.GetSize() ?? new Vector2(64, 12);
+            float swordLen = swordSize.X * (_sprite?.Scale.X ?? 1f);
+            float swordHalfLen = swordSize.X * 0.5f * (_sprite?.Scale.X ?? 1f);
+
+            inner = MathF.Max(0f, parentExtent - RangePadding);
+            outer = parentExtent + swordLen + RangePadding;
+            halfRad = Mathf.DegToRad(ConeHalfAngleDegrees);
+            offset = parentExtent + swordHalfLen; // sword node's local X offset
         }
 
         private void DoHitCheck()
