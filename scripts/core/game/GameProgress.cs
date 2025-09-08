@@ -7,6 +7,8 @@ namespace PlantProject.Core
         // Lives
         public static int LivesInitial { get; set; } = 3;
         public static int LivesRemaining { get; set; } = LivesInitial;
+        // UI/flow flags that persist across reloads
+        public static bool PendingRespawnCountdown { get; set; } = false;
 
         public static int CurrentLevelNumber { get; set; } = 1;
         // Run upgrades
@@ -32,6 +34,7 @@ namespace PlantProject.Core
             DefenseAdd = 0;
             SpeedMultiplier = 1f;
             RegenPercentBonus = 0f;
+            PendingRespawnCountdown = false;
         }
 
         public static bool UseLife()

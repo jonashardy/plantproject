@@ -9,7 +9,6 @@ namespace PlantProject.UI
         [Signal] public delegate void CountdownCompletedEventHandler();
 
         [Export] public float StartSeconds { get; set; } = 3.0f;
-        [Export] public float FightFadeSeconds { get; set; } = 0.6f;
         [Export] public int FontSize { get; set; } = 96;
         [Export] public Color TextColor { get; set; } = new Color(1f, 1f, 1f, 1f);
 
@@ -94,7 +93,7 @@ namespace PlantProject.UI
                     _label.Text = "FIGHT!";
                     var tw = CreateTween();
                     tw.SetPauseMode(Tween.TweenPauseMode.Process);
-                    tw.TweenProperty(_label, "modulate:a", 0.0f, FightFadeSeconds);
+                    tw.TweenProperty(_label, "modulate:a", 0.0f, PlantProject.Core.UI.FightFadeSeconds);
                     tw.Finished += OnFadeFinished;
                 }
             }

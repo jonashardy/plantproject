@@ -23,12 +23,14 @@ namespace PlantProject.UI
         private Label? _levelLabel;
         private SpecialMeter? _special;
         private GameOverOverlay? _gameOver;
+        private DeathOverlay? _death;
         private LevelCompleteOverlay? _levelComplete;
         private bool _levelCompleteShown;
         private PlantProject.Core.RewardChoice[]? _pendingRewards;
         private PauseOverlay? _pause;
         private bool _pauseShown;
         private CountdownOverlay? _countdown;
+        private bool _awaitingNextLevelAfterCountdown;
 
         public override void _Ready()
         {
@@ -59,6 +61,7 @@ namespace PlantProject.UI
 
             // Defer countdown start to ensure all units (player + enemies) have spawned
             CallDeferred(nameof(StartFreshRunCountdown));
+            CallDeferred(nameof(StartRespawnCountdownIfNeeded));
         }
 
         public override void _Process(double delta)
@@ -86,7 +89,18 @@ namespace PlantProject.UI
             // Wait a tiny moment to ensure spawner _Ready() completed and enemies are in the tree
             var timer = GetTree().CreateTimer(0.01);
             await ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
-            _countdown?.StartCountdown(3.0f);
+            _countdown?.StartCountdown(PlantProject.Core.UI.CountdownSeconds);
+        }
+
+        private async void StartRespawnCountdownIfNeeded()
+        {
+            if (!GameProgress.PendingRespawnCountdown) return;
+            // Clear the flag immediately to avoid duplicate starts
+            GameProgress.PendingRespawnCountdown = false;
+            // Wait a tiny moment to ensure scene finished reloading and nodes are ready
+            var timer = GetTree().CreateTimer(0.01);
+            await ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
+            _countdown?.StartCountdown(PlantProject.Core.UI.CountdownSeconds);
         }
 
         private static void EnsureUiActions()
@@ -246,10 +260,16 @@ namespace PlantProject.UI
             _gameOver.Connect(GameOverOverlay.SignalName.RestartRequested, new Callable(this, nameof(OnRestartPressed)));
             _gameOver.Connect(GameOverOverlay.SignalName.QuitRequested, new Callable(this, nameof(OnQuitPressed)));
 
+            // Death overlay (you have fallen)
+            _death = new DeathOverlay { Name = "Death" };
+            AddChild(_death);
+            _death.Connect(DeathOverlay.SignalName.TryAgainRequested, new Callable(this, nameof(OnTryAgainAfterDeath)));
+            _death.Connect(DeathOverlay.SignalName.MainMenuRequested, new Callable(this, nameof(OnMainMenuPressed)));
+            _death.Connect(DeathOverlay.SignalName.QuitRequested, new Callable(this, nameof(OnQuitPressed)));
+
             // Level complete overlay (same framework)
             _levelComplete = new LevelCompleteOverlay { Name = "LevelComplete" };
             AddChild(_levelComplete);
-            _levelComplete.Connect(LevelCompleteOverlay.SignalName.RestartRequested, new Callable(this, nameof(OnNextLevelPressed)));
             _levelComplete.Connect(LevelCompleteOverlay.SignalName.QuitRequested, new Callable(this, nameof(OnQuitPressed)));
             _levelComplete.Connect(LevelCompleteOverlay.SignalName.RewardSelected, new Callable(this, nameof(OnRewardSelected)));
 
@@ -263,6 +283,7 @@ namespace PlantProject.UI
             // Countdown overlay for new game start
             _countdown = new CountdownOverlay { Name = "Countdown" };
             AddChild(_countdown);
+            _countdown.Connect(CountdownOverlay.SignalName.CountdownCompleted, new Callable(this, nameof(OnCountdownCompleted)));
         }
 
         private GodotUnit2D? FindPlayer()
@@ -300,7 +321,7 @@ namespace PlantProject.UI
             UpdateLivesText();
             if (hasMore)
             {
-                OnRestartPressed();
+                ShowDeath();
             }
             else
             {
@@ -394,6 +415,13 @@ namespace PlantProject.UI
             GetTree().Paused = true;
         }
 
+        private void ShowDeath()
+        {
+            if (_death == null) return;
+            _death.ShowOverlay();
+            GetTree().Paused = true;
+        }
+
         private void ShowLevelComplete(PlantProject.Core.RewardChoice[]? rewards = null)
         {
             if (_levelComplete == null) return;
@@ -407,8 +435,22 @@ namespace PlantProject.UI
         {
             if (_pendingRewards == null || index < 0 || index >= _pendingRewards.Length) return;
             PlantProject.Core.RewardSystem.ApplyChoice(_pendingRewards[index]);
-            // Proceed to next level after choosing a reward
-            OnNextLevelPressed();
+            // Hide level complete overlay and start a short countdown before next level
+            if (_levelComplete != null)
+            {
+                _levelComplete.HideOverlay();
+            }
+            _awaitingNextLevelAfterCountdown = true;
+            _countdown?.StartCountdown(PlantProject.Core.UI.CountdownSeconds);
+        }
+
+        private void OnCountdownCompleted()
+        {
+            if (_awaitingNextLevelAfterCountdown)
+            {
+                _awaitingNextLevelAfterCountdown = false;
+                OnNextLevelPressed();
+            }
         }
 
         private void OnRestartPressed()
@@ -440,6 +482,25 @@ namespace PlantProject.UI
             GetTree().Quit();
         }
 
+        private void OnMainMenuPressed()
+        {
+            var tree = GetTree();
+            tree.Paused = false;
+            GameProgress.Reset();
+            var amb = tree.Root.GetNodeOrNull<AmbientMusic>("AmbientMusic");
+            amb?.PlayTrackByPath("res://assets/audio/music/Pixel Dreamscape.mp3");
+            tree.ChangeSceneToFile("res://scenes/ui/start_menu.tscn");
+        }
+
+        private void OnTryAgainAfterDeath()
+        {
+            // Hide the death overlay, mark that a respawn countdown should run after reload,
+            // then reload the current scene immediately.
+            if (_death != null) _death.HideOverlay();
+            GameProgress.PendingRespawnCountdown = true;
+            OnRestartPressed();
+        }
+
         private void OnNextLevelPressed()
         {
             var tree = GetTree();
@@ -465,6 +526,7 @@ namespace PlantProject.UI
             // Don't allow pausing over blocking overlays
             if (_countdown != null && _countdown.Visible) return;
             if (_gameOver != null && _gameOver.Visible) return;
+            if (_death != null && _death.Visible) return;
             if (_levelComplete != null && _levelComplete.Visible) return;
 
             if (!_pauseShown)
@@ -491,7 +553,7 @@ namespace PlantProject.UI
             _pause.HideOverlay();
             _pauseShown = false;
             // Unpause only if no other overlays are holding pause
-            if ((_gameOver == null || !_gameOver.Visible) && (_levelComplete == null || !_levelComplete.Visible))
+            if ((_gameOver == null || !_gameOver.Visible) && (_death == null || !_death.Visible) && (_levelComplete == null || !_levelComplete.Visible))
             {
                 GetTree().Paused = false;
             }

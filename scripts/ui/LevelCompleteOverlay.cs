@@ -7,7 +7,6 @@ namespace PlantProject.UI
     [GlobalClass]
     public partial class LevelCompleteOverlay : Control
     {
-        [Signal] public delegate void RestartRequestedEventHandler();
         [Signal] public delegate void QuitRequestedEventHandler();
         [Signal] public delegate void RewardSelectedEventHandler(int index);
 
@@ -70,19 +69,29 @@ namespace PlantProject.UI
             title.AddThemeFontSizeOverride("font_size", 36);
             vbox.AddChild(title);
 
-            vbox.AddChild(new Control { CustomMinimumSize = new Vector2(0, 16) });
+            // Subtitle under the title
+            var subtitle = new Label
+            {
+                Text = "Choose a reward to continue",
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            subtitle.AddThemeFontSizeOverride("font_size", 24);
+            subtitle.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f, 0.85f));
+            vbox.AddChild(subtitle);
+
+            vbox.AddChild(new Control { CustomMinimumSize = new Vector2(0, 12) });
 
             // Choice box placeholder
-            _choiceBox = new VBoxContainer();
+            _choiceBox = new VBoxContainer
+            {
+                SizeFlagsVertical = SizeFlags.ExpandFill
+            };
+            _choiceBox.AddThemeConstantOverride("separation", 8);
             vbox.AddChild(_choiceBox);
 
             vbox.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
 
-            var btnRestart = new Button { Text = "Next Level" };
-            btnRestart.Pressed += () => EmitSignal(SignalName.RestartRequested);
-            vbox.AddChild(btnRestart);
-
-            var btnQuit = new Button { Text = "End Game" };
+            var btnQuit = new Button { Text = "End Game", SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
             btnQuit.Pressed += () => EmitSignal(SignalName.QuitRequested);
             vbox.AddChild(btnQuit);
         }

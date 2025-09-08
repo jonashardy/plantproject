@@ -1,0 +1,8 @@
+[gd_resource type="Resource" load_steps=2]
+
+[ext_resource type="Script" path="res://scripts/core/game/UIConfig.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+CountdownSeconds = 3.0
+FightFadeSeconds = 0.6
